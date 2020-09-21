@@ -191,22 +191,38 @@ public class InvokeHTTP extends AbstractProcessor {
             .name("Connection Timeout")
             .description("Max wait time for connection to remote service.")
             .required(true)
-            .defaultValue("5 secs")
-            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .defaultValue("10 secs")
+            .addValidator(StandardValidators.createTimePeriodValidator(0, TimeUnit.MILLISECONDS, Integer.MAX_VALUE, TimeUnit.MILLISECONDS))
             .build();
 
     public static final PropertyDescriptor PROP_READ_TIMEOUT = new PropertyDescriptor.Builder()
             .name("Read Timeout")
             .description("Max wait time for response from remote service.")
             .required(true)
-            .defaultValue("15 secs")
-            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .defaultValue("10 secs")
+            .addValidator(StandardValidators.createTimePeriodValidator(0, TimeUnit.MILLISECONDS, Integer.MAX_VALUE, TimeUnit.MILLISECONDS))
             .build();
 
-    public static final PropertyDescriptor PROP_IDLE_TIMEOUT = new PropertyDescriptor.Builder()
-            .name("idle-timeout")
-            .displayName("Idle Timeout")
-            .description("Max idle time before closing connection to the remote service.")
+    public static final PropertyDescriptor PROP_WRITE_TIMEOUT = new PropertyDescriptor.Builder()
+            .name("Write Timeout")
+            .description("Max wait time for request to be written to remote service.")
+            .required(true)
+            .defaultValue("10 secs")
+            .addValidator(StandardValidators.createTimePeriodValidator(0, TimeUnit.MILLISECONDS, Integer.MAX_VALUE, TimeUnit.MILLISECONDS))
+            .build();
+
+    public static final PropertyDescriptor PROP_CALL_TIMEOUT = new PropertyDescriptor.Builder()
+            .name("Call Timeout")
+            .description("Max time for the entire call (resolving DNS, connecting, writing the request body, server processing, and reading the response body) to the remote service.")
+            .required(true)
+            .defaultValue("0 secs")
+            .addValidator(StandardValidators.createTimePeriodValidator(0, TimeUnit.MILLISECONDS, Integer.MAX_VALUE, TimeUnit.MILLISECONDS))
+            .build();
+
+    public static final PropertyDescriptor PROP_KEEP_ALIVE_DURATION = new PropertyDescriptor.Builder()
+            .name("keep-alive-duration")
+            .displayName("Keep-Alive Duration")
+            .description("Time to keep-alive connections to an address in the connection pool.")
             .required(true)
             .defaultValue("5 mins")
             .addValidator(StandardValidators.createTimePeriodValidator(1, TimeUnit.MILLISECONDS, Integer.MAX_VALUE, TimeUnit.SECONDS))
@@ -484,7 +500,9 @@ public class InvokeHTTP extends AbstractProcessor {
             PROP_SSL_CONTEXT_SERVICE,
             PROP_CONNECT_TIMEOUT,
             PROP_READ_TIMEOUT,
-            PROP_IDLE_TIMEOUT,
+            PROP_WRITE_TIMEOUT,
+            PROP_CALL_TIMEOUT,
+            PROP_KEEP_ALIVE_DURATION,
             PROP_MAX_IDLE_CONNECTIONS,
             PROP_DATE_HEADER,
             PROP_FOLLOW_REDIRECTS,
@@ -744,14 +762,16 @@ public class InvokeHTTP extends AbstractProcessor {
         }
 
         // Set timeouts
-        okHttpClientBuilder.connectTimeout((context.getProperty(PROP_CONNECT_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue()), TimeUnit.MILLISECONDS);
-        okHttpClientBuilder.readTimeout(context.getProperty(PROP_READ_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue(), TimeUnit.MILLISECONDS);
+        okHttpClientBuilder.connectTimeout((context.getProperty(PROP_CONNECT_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
+        okHttpClientBuilder.readTimeout(context.getProperty(PROP_READ_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+        okHttpClientBuilder.writeTimeout(context.getProperty(PROP_WRITE_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+        okHttpClientBuilder.callTimeout(context.getProperty(PROP_CALL_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
 
         // Set connectionpool limits
         okHttpClientBuilder.connectionPool(
                 new ConnectionPool(
                         context.getProperty(PROP_MAX_IDLE_CONNECTIONS).asInteger(),
-                        context.getProperty(PROP_IDLE_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue(), TimeUnit.MILLISECONDS
+                        context.getProperty(PROP_KEEP_ALIVE_DURATION).asTimePeriod(TimeUnit.MILLISECONDS).longValue(), TimeUnit.MILLISECONDS
                 )
         );
 
